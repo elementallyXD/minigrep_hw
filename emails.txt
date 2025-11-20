@@ -1,0 +1,6 @@
+alice@example.com
+bob_at_example.com
+carol@example.org
+bot_gmail.com
+bob@chain.org
+test_bot_@gmail.com
