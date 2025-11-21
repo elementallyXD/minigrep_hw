@@ -1,7 +1,11 @@
+// Bidiak Mykhailo
+// A minimal grep-like utility using Hyperscan for regex matching.
+
 #![deny(warnings, clippy::all, clippy::perf)]
 
 // External crates
 use anyhow::{anyhow, Context, Result};
+
 use std::{
     env,
     ffi::{CStr, CString},
@@ -43,13 +47,13 @@ fn compile_database(pattern: &str) -> Result<*mut hs::hs_database_t>
     let mut db: *mut hs::hs_database_t = ptr::null_mut();
     let mut err: *mut hs::hs_compile_error_t = ptr::null_mut();
 
-    // SAFETY: Calls Hyperscan to compile the pattern.
-    let rc = unsafe 
+    // Calls Hyperscan to compile the pattern.
+    let result = unsafe 
     {
         hs::hs_compile(
             pat_c.as_ptr(),
             0,
-            hs::HS_MODE_BLOCK, // block-scanning mode
+            hs::HS_MODE_BLOCK,
             ptr::null(),
             &mut db,
             &mut err,
@@ -57,9 +61,8 @@ fn compile_database(pattern: &str) -> Result<*mut hs::hs_database_t>
     };
 
     // Check for compilation errors.
-    if rc != hs::HS_SUCCESS as i32 
+    if result != hs::HS_SUCCESS as i32 
     {
-        // SAFETY: `err` (if non-null) is allocated by Hyperscan and must be freed.
         let msg = unsafe 
         {
             if !err.is_null() && !(*err).message.is_null() 
@@ -87,11 +90,12 @@ fn alloc_scratch(db: *mut hs::hs_database_t) -> Result<*mut hs::hs_scratch_t>
 {
     let mut scratch: *mut hs::hs_scratch_t = ptr::null_mut();
 
-    let rc = unsafe { hs::hs_alloc_scratch(db, &mut scratch) };
+    // Calls Hyperscan to allocate scratch space.
+    let result = unsafe { hs::hs_alloc_scratch(db, &mut scratch) };
 
-    if rc != hs::HS_SUCCESS as i32 
+    if result != hs::HS_SUCCESS as i32 
     {
-        return Err(anyhow!("failed to allocate Hyperscan scratch (rc={rc})"));
+        return Err(anyhow!("Failed: Unable to allocate Hyperscan scratch (rc = {result})"));
     }
 
     Ok(scratch)
@@ -99,11 +103,14 @@ fn alloc_scratch(db: *mut hs::hs_database_t) -> Result<*mut hs::hs_scratch_t>
 
 // Scan a line of text using the given Hyperscan database and scratch space.
 // Returns true if a match was found.
-fn scan_line(db: *mut hs::hs_database_t, scratch: *mut hs::hs_scratch_t, line: &str) -> Result<bool> 
+fn scan_line(
+    db: *mut hs::hs_database_t, 
+    scratch: *mut hs::hs_scratch_t, 
+    line: &str) -> Result<bool> 
 {
-    let mut matched = false;
+    let mut matched: bool = false;
 
-    let rc = unsafe 
+    let result: i32 = unsafe 
     {
         hs::hs_scan(
             db,
@@ -116,9 +123,9 @@ fn scan_line(db: *mut hs::hs_database_t, scratch: *mut hs::hs_scratch_t, line: &
         )
     };
 
-    if rc != hs::HS_SUCCESS as i32 
+    if result != hs::HS_SUCCESS as i32 
     {
-        return Err(anyhow!("hs_scan failed (rc={rc})"));
+        return Err(anyhow!("hs_scan failed (rc={result})"));
     }
 
     Ok(matched)
@@ -128,7 +135,8 @@ fn main() -> Result<()>
 {
     // Get the regex pattern from command-line arguments.
     // If not provided, print usage and exit.
-    let pattern = match env::args().nth(1) {
+    let pattern = match env::args().nth(1) 
+    {
         Some(p) => p,
         None => {
             eprintln!("Usage:\n  type file.txt | minigrep_hw.exe \"<regex>\"\nExample:\n  type emails.txt | minigrep_h \"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{{2,}}$\"");
